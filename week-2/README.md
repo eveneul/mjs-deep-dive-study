@@ -424,3 +424,115 @@ console.log(foo);
 
 - `const`는 선언과 동시에 할당을 해야 한다. 즉, 값이 변하지 않을 값인 **상수**다.
 - 하지만 재할당을 금지할 뿐 불변을 의미하지는 않는다. **`const` 키워드로 선언한 변수에 객체를 할당한 경우 값을 변경할 수 있다.**
+
+# 프로퍼티 어트리뷰트
+
+자바스크립트의 객체는 겉으로 보이는 값 외에도 숨겨진 속성들(`[[내부 슬롯]]`)을 가지고 있다. 평소에 `obj.name = "다솜"` 이라고 하면 그냥 값이 변경되는 것 같았으나, 내부적으로는 4가지 속성이 같이 붙어 있다.
+
+## 데이터 프로퍼티
+
+```js
+const obj = { name: "준모" };
+Object.getOwnPropertyDescriptor(obj, "name");
+// { value: "준모", writeable: true, enumerable: true, configurable: true }
+```
+
+| 프로퍼티 어트리뷰트 | 설명                                              |
+| ------------------- | ------------------------------------------------- |
+| `[[Value]]`         | 실제 값(`준모`)                                   |
+| `[[Writable]]`      | false면 값 바꿔도 무시됨 (strict mode에서는 에러) |
+| `[[Enumerable]]`    | false면 for...in, Object.keys()에 안 나옴         |
+| `[[configurable]]`  | false면 프로퍼티 삭제/재정의 불가                 |
+
+## 접근자 프로퍼티
+
+값을 직접 저장하지 않고, 읽고(`get`) 쓸 때(`set`) 함수를 실행시키는 방식.
+
+```js
+const person = {
+  _name: "하늘",
+  get name() {
+    return this._name;
+  }, // [[Get]]
+  set name(val) {
+    this._name = val.trim();
+  }, // [[Set]]
+};
+
+person.name; // → get 함수 실행
+person.name = " 짱 "; // → set 함수 실행 (공백 제거됨)
+```
+
+## Object.defineProperty
+
+수동으로 어트리뷰트를 조작할 때 쓰는 메서드. 예시로 `true`였던 `Writable` 데이터 프로퍼티를 `false`로 변경할 수 있다.
+
+```js
+const obj = {};
+Object.defineProperty(obj, "id", {
+  value: 42,
+  writable: false, // 값 변경 불가
+  enumerable: false, // for...in에 안 나옴
+  configurable: false, // 삭제/재정의 불가
+});
+
+obj.id = 99; // 조용히 무시됨 (strict에선 TypeError)
+delete obj.id; // 조용히 무시됨
+```
+
+라이브러리 내부 API를 보호하거나 읽기 전용 상수로 만들 때 쓰인다.
+
+## 객체 변경 감지
+
+|                   | `Object.preventExtensions` | `Object.seal` | `Object.freeze` |
+| ----------------- | -------------------------- | ------------- | --------------- |
+| 프로퍼티 추가     | X                          | X             | X               |
+| 프로퍼티 삭제     | O                          | X             | X               |
+| 값 변경           | O                          | O             | X               |
+| 어트리뷰트 재정의 | O                          | X             | X               |
+
+객체의 값을 추가하거나 수정 등 변경하는 것을 막을 때 쓰이는 메서드다. 오른쪽으로 갈수록 잠금 강도가 높아진다. 즉 `Object.freeze`가 제일 프로퍼티 수정이 제한적이다.
+
+### `Object.preventExtensions`
+
+```js
+const obj = { name: "다솜" };
+Object.preventExtensions(obj);
+
+obj.age = 26; // 무시됨 (추가는 하지 못하니까)
+delete obj.name; // 삭제는 됨
+obj.name = "하늘"; // 값 변경도 됨
+```
+
+### `Object.seal`
+
+추가와 삭제, 어트리뷰트 재정의를 막는다.
+
+```js
+const obj = { name: "준모" };
+Object.seal(obj);
+
+obj.age = 26; // 무시됨
+delete obj.name; // 무시됨
+obj.name = "하늘"; // 값 변경은 됨
+```
+
+### `Object.freeze`
+
+추가, 삭제, 변경 전부 제한한다.
+
+```js
+const obj = { name: "연욱" };
+Object.freeze(obj);
+
+obj.age = 26; // 무시됨
+delete obj.name; // 무시됨
+obj.name = "하늘"; // 무시됨
+```
+
+### 주의할 점
+
+- 얕은 동결이다. Depth가 1단계까지만 적용되어서 중첩 객체는 영향이 없다.
+- 중첩 객체까지 동결시키려면 재귀로 직접 구현해야 한다.
+
+(여담) 며칠 전에 영서 블로그에서 `Object.freeze`와 관련된 글을 봤다. 읽어 보면 좋은 글 같아서 공유한다. [(링크)](https://www.yeongseo-blog.site/blog/enum-as-const-const-enum-objectfreeze)
