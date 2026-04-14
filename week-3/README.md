@@ -15,8 +15,7 @@
 `new` 연산자와 함께 호출하여 객체(인스턴스)를 생성하는 함수.
 `String`, `Number`, `Boolean`, `Function`, `Array`, `Date`, `Math` 등의 빌트인 생성자 함수를 제공한다.
 
-> `this`
-> `this`는 객체 자신의 프로퍼티나 메서드를 참조하기 위한 자기 참조 변수다. 함수 호출 방식에 따라 동적으로 결정된다.
+> `this` > `this`는 객체 자신의 프로퍼티나 메서드를 참조하기 위한 자기 참조 변수다. 함수 호출 방식에 따라 동적으로 결정된다.
 
 | 함수 호출 방식       | this가 가리키는 값(this 바인딩) |
 | -------------------- | ------------------------------- |
@@ -176,4 +175,115 @@ function Person(name) {
 
   this.name = name;
 }
+```
+
+# 함수와 일급 객체
+
+## 일급 객체를 충족하는 4가지 조건
+
+**1. 무명 리터럴로 생성 가능, 런타임에 변수 할당 가능**
+
+```js
+const foo = function () {
+  return "hello";
+}; // 익명 함수 리터럴을 변수에 할당
+```
+
+**2. 다른 함수의 인수로 전달 가능**
+
+```js
+[1, 2, 3].map(function (number) {
+  return number * 2;
+});
+```
+
+**3. 다른 함수의 반환값으로 사용 가능**
+
+```js
+function makeAdder(x) {
+  return function (y) {
+    return x + y;
+  }; // 함수를 반환
+}
+
+const add5 = makeAdder(5);
+add(3); // 5 + 3 = 8
+```
+
+**4. 객체/배열 같은 자료구조에 저장 가능**
+
+```js
+const actions = {
+  fn1: function () {},
+  fn2: function () {},
+};
+```
+
+## 함수 객체만의 고유 프로퍼티
+
+일반 객체에는 없고 함수만 갖고 있는 프로퍼티다.
+
+**1. `arguments`**
+
+- 함수 내부에서만 접근 가능한 유사 배열 객체 (`map`, `reduce` 같은 배열 메서드 사용 불가)
+- 매개변수의 개수를 모를 때 가변 인수 처리에 사용
+- ES6 이후부터는 \*\*rest 파라미터(`...args`)가 권장
+
+```js
+function sum() {
+  console.log(arguments); // Arguments [1, 2, 3]
+  return Array.from(arguments).reduce((a, b) => a + b, 0); // 배열 메서드 사용 불가로 Array.from 사용
+}
+
+sum(1, 2, 3); // 6
+```
+
+**2. length**
+
+- 선언한 매개변수의 개수를 알 수 있음
+- 함수의 `length`와 `arguments`의 `length`는 다름
+
+```js
+function foo(a, b) {}
+foo.length; // 2
+
+function bar(a, b, c) {}
+bar(1, 2);
+
+bar.length; // 3
+arguments.length; // 2 (실제로 전달된 인수 개수)
+```
+
+**3. `name`**
+
+- 함수 이름
+- ES5에서는 익명 함수는 빈 문자열로 되었지만, ES6에서는 변수명으로 추론해 줌
+
+```js
+const named = function foo() {};
+named.name; // foo
+
+const anon = function () {};
+anon.name; // ES5에서는 '', ES6에서는 'anon'
+
+const arrow = () => {};
+arrow.name; // arrow
+```
+
+**4. `prototype`**
+
+- `new` 연산자로 호출 가능한(constructor) 함수만 보유
+- 생성된 인스턴스의 프로토타입 객체를 가르킴
+
+```js
+function Person(name) {
+  this.name = name;
+}
+Person.prototype; // { constructor: f } <- 생성자 함수만 소유
+
+const obj = {};
+obj.prototype; // undefined <- 일반 객체는 없음
+
+const arrowFn = () => {};
+arrowFn.prototype; // undefined <- 화살표 함수도 없음 (non-constructor)
 ```
