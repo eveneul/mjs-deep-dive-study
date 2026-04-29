@@ -178,3 +178,131 @@ fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
 // 디코딩은 decodeURIComponent로
 decodeURIComponent("%EC%9D%B4%EB%A6%84"); // '이름'
 ```
+
+# `this`
+
+## 생겨난 이유
+
+- 객체는 상태(프로퍼티)와 동작(메서드)을 하나의 논리적 단위로 묶은 자료구조.
+- 메서드가 자신이 속한 객체의 프로퍼티를 참조하려면 자신이 속한 객체를 가리키는 식별자를 참조할 수 있어야 한다
+
+-> `this`는 자신이 속한 객체, 또는 자신이 생성할 인스턴스를 가리키는 **자기 참조 변수**
+
+## `this`의 특징
+
+- 자바스크립트 엔진에 의해 암묵적으로 생성
+- 코드 어디에서든지 참조 가능
+- `this` 바인딩은 **함수 호출 방식에 의해 동적으로 결정**
+- `strict mode` 또한 `this` 바인딩에 영향을 준다
+
+## 함수 호출 방식에 따른 `this` 바인딩
+
+| 호출 방식           | this 바인딩                   |
+| ------------------- | ----------------------------- |
+| 일반 함수 호출      | 전역 객체 (window / global)   |
+| 메서드 호출         | 메서드를 호출한 객체          |
+| 생성자 함수 호출    | 생성자 함수가 생성할 인스턴스 |
+| apply / call / bind | 첫 번째 인수로 전달한 객체    |
+
+### 1. 일반 함수 호출
+
+```js
+function foo() {
+  console.log(this); // window (전역 객체)
+}
+
+foo();
+```
+
+- strict mode에서는 `undefined`
+- 콜백 함수, 중첩 함수도 **일반 함수로 호출되면 `this`는 전역 객체**
+
+메서드 내부의 중첩 함수나 콜백 함수의 `this`가 전역 객체를 가리키는 문제는 아래처럼 해결할 수 있다.
+
+```js
+const obj = {
+  value: 100,
+  foo() {
+    // ① this를 변수에 저장
+    const that = this;
+    setTimeout(function () {
+      console.log(that.value); // 100
+    }, 100);
+
+    // ② 화살표 함수 사용 (상위 스코프의 this를 그대로 사용)
+    setTimeout(() => console.log(this.value), 100); // 100
+  }
+};
+```
+
+### 2. 메서드 호출
+
+```js
+const person = {
+  name: 'Lee',
+  getName() {
+    return this.name; // this === 메서드를 호출한 객체
+  }
+};
+
+console.log(person.getName()); // 'Lee'
+```
+
+`this`는 메서드를 **소유한 객체**가 아니라 메서드를 **호출한 객체**에 바인딩된다.
+
+```js
+const anotherPerson = { name: 'Kim' };
+anotherPerson.getName = person.getName;
+
+console.log(anotherPerson.getName()); // 'Kim' — 호출한 객체가 달라졌기 때문
+```
+
+### 3. 생성자 함수 호출
+
+```js
+function Circle(radius) {
+  this.radius = radius; // this === 생성자 함수가 생성할 인스턴스
+}
+
+const c1 = new Circle(5);
+console.log(c1.radius); // 5
+```
+
+`new` 없이 호출하면 일반 함수처럼 동작해서 `this`가 전역 객체를 가리키게 된다.
+
+### 4. `apply` / `call` / `bind`
+
+`Function.prototype`의 메서드로, `this`를 명시적으로 지정할 수 있다.
+
+**`apply` / `call`** — `this`를 지정하면서 함수를 즉시 호출
+
+```js
+function greet(greeting) {
+  console.log(`${greeting}, ${this.name}`);
+}
+
+const user = { name: 'Lee' };
+
+greet.apply(user, ['Hello']); // Hello, Lee  (인수를 배열로 전달)
+greet.call(user, 'Hello');    // Hello, Lee  (인수를 쉼표로 구분해 전달)
+```
+
+**`bind`** — 함수를 호출하지 않고 `this`가 바인딩된 새 함수를 반환
+
+```js
+const boundGreet = greet.bind(user);
+boundGreet('Hi'); // Hi, Lee
+```
+
+메서드 내부 콜백 함수의 `this` 불일치 문제를 해결할 때 유용하다.
+
+```js
+const obj = {
+  value: 100,
+  foo() {
+    setTimeout(function () {
+      console.log(this.value); // 100
+    }.bind(this), 100);
+  }
+};
+```
