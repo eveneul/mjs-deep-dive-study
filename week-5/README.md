@@ -147,3 +147,177 @@ foo(20);
     → 전역으로 복귀
   → 전역 컨텍스트 pop → 콜 스택 비움
 ```
+
+# <클로저>
+
+- **외부 함수보다 내부 함수가 더 오래 살아남아서 이미 종료된 외부 함수의 변수를 계속 참조할 수 있는 현상**이다.
+
+## 1. 렉시컬 스코프
+
+- JS는 함수를 어디서 호출했는지가 아닌 **어디에서 정의되었는지**를 기준으로 상위 스코프를 결정한다.
+- 이것이 렉시컬 스코프(정적 스코프)다.
+
+```js
+const x = 1;
+
+function foo() {
+  const x = 10;
+  bar();
+}
+
+function bar() {
+  console.log(x);
+}
+
+foo(); // 1
+bar(); // 1
+```
+
+- `bar`는 `foo` 안에서 호출되었지만, **전역에서 정의되었기 때문에** 상위 스코프는 **전역**이다.
+- 그러므로 `x`는 `1`이다.
+
+## 2. 함수 객체의 내부 슬롯 `[[Environment]]`
+
+- 함수는 자신이 정의된 환경, 즉 자신의 상위 스코프를 `[[Environment]]`라는 내부 슬롯에 저장한다.
+- 함수가 평가(선언)될 때, 현재 실행 중인 실행 컨텍스트의 렉시컬 환경이 `[[Environment]]`에 저장된다.
+- 그 함수가 호출되어 함수 실행 컨텍스트가 만들어질 때 `[[Environment]]`에 저장해 둔 렉시컬 환경이 외부 렉시컬 환경 참조로 설정된다.
+- 함수는 자신이 태어난 환경을 `[[Environment]]`에 품고 다니다가, 실행될 때 그 환경을 외부 참조로 연결하여 스코프 체인을 완성한다.
+
+## 3. 클로저가 생성되는 과정
+
+```js
+const x = 1;
+
+function outer() {
+  const x = 10;
+  const inner = function () {
+    console.log(x);
+  };
+  return inner;
+}
+
+const innerFunc = outer();
+innerFunc(); // 10
+```
+
+1. `outer` 함수가 정의될 때, `outer` 함수 객체의 `[[Environment]]`에 전역 렉시컬 환경이 저장된다.
+2. `outer()`가 호출되면, `outer` 실행 컨텍스트가 콜 스택에 push되고, outer의 렉시컬 환경이 생성된다. (이 환경의 환경 레코드에 `x: 10`이 등록된다)
+3. `inner` 함수가 평가될 때, inner 함수 객체의 `[[Environment]]`에 현재 실행 중인 컨텍스트, `outer`의 렉시컬 환경이 저장된다.
+4. `outer`가 `inner`를 반환하고 종료되면, `outer` 실행 컨텍스트는 콜 스택에서 pop된다.
+
+- 일반적인 상황이라면 이 시점에서 `outer`의 랙시컬 환경도 메모리에서 사라져야 하지만,
+- `inner` 함수 객체의 `[[Environment]]`가 `outer`의 렉시컬 환경을 참조하고 있기 때문에, 가비지 컬렉터가 수거하지 못한다.
+- 참조가 살아있는 한 메모리에 남는다.
+
+5. `innerFunc()`가 호출되면, `inner` 실행 컨텍스트가 생성되고, 외부 렉시컬 환경 참조로 `[[Environment]]`에 저장된 `outer`의 렉시컬 환경이 연결된다.
+6. `console.log(x)`에서 `x`를 검색하면 inner 환경 레코드에는 없으니 `outer`의 렉시컬 환경으로 올라가고, 거기에서 `x: 10`을 찾는다.
+   -> outer는 이미 종료되었지만 렉시컬 환경이 메모리에 살아 있기 때문에 결과적으로 `10`이 출력된다.
+
+## 4. 클로저가 아닌 경우
+
+```js
+function foo() {
+  const x = 1;
+  const y = 2;
+
+  function bar() {
+    const z = 3;
+    console.log(z); // 상위 스코프 변수를 참조하지 않음
+  }
+
+  return bar;
+}
+
+const bar = foo();
+bar();
+```
+
+- `bar`는 외부 함수인 `foo`보다 오래 살아남지만 **`foo`의 변수 `x`, `y`를 전혀 참조하지 않는다.**
+- 이런 경우 JS 엔진은 최적화를 통해 상위 스코프 변수를 메모리에 유지하지 않는다.
+- 상위 스코프 변수를 참조하더라도 **외부 함수보다 내부 함수가 더 오래 살아남지 않으면** 클로저가 아니다.
+- 중첩 함수가 상위 스코프의 식별자를 참조하고 있고, 외부 함수보다 더 오래 유지되는 경우에만 클로저라고 부른다.
+
+## 5. 클로저의 활용
+
+### 1) 상태 은닉과 캡슐화
+
+```js
+const counter = (function () {
+  let num = 0; // 외부에서 직접 접근 불가
+
+  return {
+    increase() {
+      return ++num;
+    },
+    decrease() {
+      return --num;
+    },
+  };
+})();
+
+console.log(counter.increase()); // 1
+console.log(counter.increase()); // 2
+console.log(counter.decrease()); // 1
+```
+
+- `num` 변수는 즉시 실행 함수의 지역 변수라서 외부에서 직접 접근할 방식이 없다.
+- 오직 반환되는 `increase`와 `decrease` 메서드를 통해서만 변경할 수 있다.
+- 두 메서드 모두 동일한 렉시컬 환경을 `[[Environment]]`로 공유하기 때문에 `num`을 바라보면서 상태를 공유한다.
+
+### 2) 함수 팩토리
+
+```js
+function makeAdder(x) {
+  return function (y) {
+    return x + y;
+  };
+}
+
+const add5 = makeAdder(5);
+const add10 = makeAdder(10);
+
+console.log(add5(3)); // 8
+console.log(add10(3)); // 13
+```
+
+- `add5`와 `add10`은 각각 독립된 `makeAdder` 호출로 만들어졌다. -> 각자 별개의 랙시컬 환경의 `[[Environment]]`을 가지고 있다.
+- 그러므로 `add5`의 `x`와 `add10`의 `x`는 서로 다른 변수다.
+
+## 클로저와 루프
+
+```js
+var funcs = [];
+
+for (var i = 0; i < 3; i++) {
+  funcs[i] = function () {
+    return i;
+  };
+}
+
+console.log(funcs[0]()); // 3 -> 의도는 0
+console.log(funcs[1]()); // 3 -> 의도는 1
+console.log(funcs[2]()); // 3 -> 의도는 2
+```
+
+- 의도와는 다르게 모두 `3`이 출력된다.
+- `var`로 선언된 `i`가 **함수 스코프**라서 전역 변수로 등록되기 때문이다.
+- 세 함수 모두 클로저로서 동일한 전역 렉시컬 환경의 `i`를 참조한다.
+- 루프가 끝난 시점에는 `i`가 `3`이 되었고, 함수를 호출하는 시점에 모두 같은 `i`를 바라보니 전부 `3`이 나온다.
+
+```js
+var funcs = [];
+
+for (let i = 0; i < 3; i++) {
+  funcs[i] = function () {
+    return i;
+  };
+}
+
+console.log(funcs[0]()); // 0
+console.log(funcs[1]()); // 1
+console.log(funcs[2]()); // 2
+```
+
+- `let`으로 변경하면 해결된다.
+- `let`은 블록 스코프이기 때문에 반복마다 **새로운 렉시컬 환경이 생성**된다.
+- 각 함수는 독립적인 렉시컬 환경의 `i`를 참조하게 되어 서로 다른 값을 기억한다.
